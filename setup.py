@@ -13,7 +13,7 @@ setup(
         'numpy==1.26.4',
         'pandas==2.2.1',
         'opencv-python==4.9.0.80',
-        'vidaug==0.0.4',
+        'vidaug',
         'scikit-image==0.22.0',
         'click==8.1.7',
         'matplotlib==3.8.4'
