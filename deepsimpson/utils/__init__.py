@@ -76,7 +76,7 @@ def savemajoraxis_with_simpson(results, output, split, num_discs=20, frame_btw_e
                 continue
 
             (start_x, start_y), (end_x, end_y) = result
-            buffer.append([filename, phase, frame_idx, start_x, start_y, end_x, end_y, total_frame_number])
+            buffer.append([filename, phase, frame_idx, start_x, start_y, end_x, end_y, total_frame_number,"Major Axis"])
             # Compute direction and perpendicular vectors
             axis_vector = np.array([end_x - start_x, end_y - start_y])
             if not axis_vector.any():
@@ -103,12 +103,12 @@ def savemajoraxis_with_simpson(results, output, split, num_discs=20, frame_btw_e
                 clipped = clip_line_to_mask(line_start_x, line_start_y, line_end_x, line_end_y, mask)
                 if clipped is not None:
                     (sx, sy), (ex, ey) = clipped
-                    buffer.append([filename, phase, frame_idx, sx, sy, ex, ey])
+                    buffer.append([filename, phase, frame_idx, sx, sy, ex, ey,"","Simpson's Disc"])
 
     # Write everything at once after processing
     with open(output_path, "w", newline="") as f:
         writer = csv.writer(f)
-        writer.writerow(["Filename", "Phase", "Frame", "Start_X", "Start_Y", "End_X", "End_Y","Frames",""])
+        writer.writerow(["Filename", "Phase", "Frame", "Start_X", "Start_Y", "End_X", "End_Y","Frames","Type"])
         writer.writerows(buffer)
 
 
