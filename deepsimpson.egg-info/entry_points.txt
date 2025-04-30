@@ -1,0 +1,3 @@
+[console_scripts]
+deepsim = deepsimpson.segmentation:run
+
