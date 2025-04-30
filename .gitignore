@@ -25,3 +25,6 @@ best.pt
 .DS_Store
 Thumbs.db
 
+
+# Ignore Python virtual environment
+venv/
