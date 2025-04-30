@@ -37,7 +37,7 @@ def savemajoraxis_with_simpson(results, output, split, num_discs=20, frame_btw_e
 
     output_path         = os.path.join(output, f"simpsons_{split}.csv")
     buffer              = []  # Buffer to hold all rows before writing
-    total_frame_number  = 0   # Count unique frames saved
+    
     for entry in results:
         if len(entry) != 7:
             print(f"[WARNING] Unrecognized format in savemajoraxis_with_simpson():")
@@ -52,7 +52,7 @@ def savemajoraxis_with_simpson(results, output, split, num_discs=20, frame_btw_e
         else:
             start_frame = 0
             end_frame = T
-
+        total_frame_number  = 0   # Count unique frames saved
         for frame_idx in range(start_frame, end_frame):
             mask = logit[frame_idx] > 0
             if np.sum(mask) == 0:
