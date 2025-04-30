@@ -28,16 +28,16 @@ def clip_line_to_mask(x1, y1, x2, y2, mask, num_points=100):
     end_idx = inside_indices[-1]
 
     return (xs[start_idx], ys[start_idx]), (xs[end_idx], ys[end_idx])
-def savemajoraxis_with_simpson(results, output, split, num_discs=20):
+def savemajoraxis_with_simpson(results, output, split, num_discs=20, frame_btw_ed_es=True):
     """
     Extracts and saves perpendicular line segments (discs) along the major axis of each mask
     using PCA and clips them to stay within the segmented region.
     Output is written in CSV format for Simpson's rule integration.
     """
 
-    output_path = os.path.join(output, f"simpsons_{split}.csv")
-    buffer = []  # Buffer to hold all rows before writing
-
+    output_path         = os.path.join(output, f"simpsons_{split}.csv")
+    buffer              = []  # Buffer to hold all rows before writing
+    total_frame_number  = 0   # Count unique frames saved
     for entry in results:
         if len(entry) != 7:
             print(f"[WARNING] Unrecognized format in savemajoraxis_with_simpson():")
@@ -46,11 +46,18 @@ def savemajoraxis_with_simpson(results, output, split, num_discs=20):
         filename, logit, _, systole, diastole, large_index, small_index = entry
         T = logit.shape[0]  # Number of frames in the video
 
-        for frame_idx in range(T):
+        if frame_btw_ed_es:
+            start_frame =  min(large_index, small_index)
+            end_frame   = max(large_index, small_index) + 1  # +1 for inclusive range
+        else:
+            start_frame = 0
+            end_frame = T
+
+        for frame_idx in range(start_frame, end_frame):
             mask = logit[frame_idx] > 0
             if np.sum(mask) == 0:
                 continue  # Skip empty masks
-
+            total_frame_number += 1  # Count each saved frame
             # Determine phase label for the current frame
             if frame_idx == large_index:
                 phase = "ED_GT"
@@ -69,7 +76,7 @@ def savemajoraxis_with_simpson(results, output, split, num_discs=20):
                 continue
 
             (start_x, start_y), (end_x, end_y) = result
-            buffer.append([filename, phase, frame_idx, start_x, start_y, end_x, end_y])
+            buffer.append([filename, phase, frame_idx, start_x, start_y, end_x, end_y, total_frame_number])
             # Compute direction and perpendicular vectors
             axis_vector = np.array([end_x - start_x, end_y - start_y])
             if not axis_vector.any():
@@ -101,7 +108,7 @@ def savemajoraxis_with_simpson(results, output, split, num_discs=20):
     # Write everything at once after processing
     with open(output_path, "w", newline="") as f:
         writer = csv.writer(f)
-        writer.writerow(["Filename", "Phase", "Frame", "Start_X", "Start_Y", "End_X", "End_Y"])
+        writer.writerow(["Filename", "Phase", "Frame", "Start_X", "Start_Y", "End_X", "End_Y","Frames",""])
         writer.writerows(buffer)
 
 
