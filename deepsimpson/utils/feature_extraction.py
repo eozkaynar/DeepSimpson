@@ -1,3 +1,7 @@
+import sys
+import os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
+
 from deepsimpson.datasets.EchoSegmentation import Echo
 from deepsimpson.utils import get_mean_and_std, savemask, savesize, savemajoraxis , savemajoraxis_with_simpson
 import click
@@ -14,7 +18,7 @@ import os
 
 @click.command("feature_extraction")
 @click.option("--data_dir", type=click.Path(exists=True, file_okay=False), default="/home/eda/Desktop/dynamic/EchoNet-Dynamic")
-@click.option("--output", type=click.Path(file_okay=False), default="output/features")
+@click.option("--output", type=click.Path(file_okay=False), default="deepsimpson/output/features")
 @click.option("--model_name", type=click.Choice(
     sorted(name for name in torchvision.models.segmentation.__dict__
            if name.islower() and not name.startswith("__") and callable(torchvision.models.segmentation.__dict__[name]))),
@@ -24,7 +28,7 @@ import os
 @click.option(
     "--weights",
     type=click.Path(exists=True, dir_okay=False),
-    default="output/segmentation/deeplabv3_resnet50_pretrained/best.pt",
+    default="deepsimpson/output/segmentation/deeplabv3_resnet50_pretrained/best.pt",
     show_default=True,
     help="Path to the pretrained model checkpoint."
 )

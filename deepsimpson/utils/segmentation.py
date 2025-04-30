@@ -1,5 +1,5 @@
-from EchoSegmentation import Echo
-from utils import get_mean_and_std, latexify, savevideo,savemask, savesize, savemajoraxis
+from deepsimpson.datasets.EchoSegmentation import Echo
+from deepsimpson.utils import get_mean_and_std, latexify, savevideo,savemask, savesize, savemajoraxis
 
 import click
 import matplotlib.pyplot as plt
