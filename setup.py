@@ -18,11 +18,11 @@ setup(
         'click==8.1.7',
         'matplotlib==3.8.4'
     ],
-    entry_points={{
+    entry_points={
         'console_scripts': [
             'deepsim=deepsimpson.segmentation:run',
         ],
-    }},
+    },
     author='eozkaynar',
     description='DeepSimpson: LV Segmentation and EF Estimation from EchoNet-Dynamic',
     long_description=open('README.md').read() if os.path.exists('README.md') else '',
