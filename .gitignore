@@ -1,3 +1,4 @@
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -172,3 +173,31 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+=======
+# Byte-compiled / cache files
+__pycache__/
+*.py[cod]
+*.so
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# Output folders and intermediate files
+output_images/
+output/
+*.log
+*.npy
+*.pt
+
+# Model weights and checkpoints
+checkpoint.pt
+best.pt
+
+# IDE/editor settings
+.vscode/
+.idea/
+
+# System files
+.DS_Store
+Thumbs.db
+
