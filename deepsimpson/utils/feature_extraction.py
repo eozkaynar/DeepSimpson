@@ -1,4 +1,4 @@
-from EchoSegmentation import Echo
+from deepsimpson.datasets.EchoSegmentation import Echo
 from utils import get_mean_and_std, savemask, savesize, savemajoraxis , savemajoraxis_with_simpson
 import click
 import matplotlib.pyplot as plt
