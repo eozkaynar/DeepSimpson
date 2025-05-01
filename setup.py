@@ -6,17 +6,17 @@ setup(
     version='0.1.0',
     packages=find_packages(),
     install_requires=[
-        'torch==2.2.1',
-        'torchvision==0.17.1',
-        'scikit-learn==1.4.1.post1',
-        'tqdm==4.66.2',
-        'numpy==1.26.4',
-        'pandas==2.2.1',
-        'opencv-python==4.9.0.80',
+        'torch',
+        'torchvision',
+        'scikit-learn',
+        'tqdm',
+        'numpy',
+        'pandas',
+        'opencv-python',
         'vidaug',
-        'scikit-image==0.22.0',
-        'click==8.1.7',
-        'matplotlib==3.8.4'
+        'scikit-image',
+        'click',
+        'matplotlib'
     ],
     entry_points={
         'console_scripts': [
