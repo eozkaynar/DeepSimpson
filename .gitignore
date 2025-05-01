@@ -25,6 +25,7 @@ Thumbs.db
 venv/
 
 # Python build artifacts
+deepsimpson.egg-info/
 *.egg-info/
 build/
 dist/
