@@ -1,20 +1,24 @@
+import sys
+import os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
+
 import numpy as np
 import pandas as pd
 from matplotlib import collections as mc
 import matplotlib.pyplot as plt
 import cv2 as cv
-import config as cg
+import deepsimpson.config.config as cg
 
 split = "train"
 # Load data
-major_axis_df = pd.read_csv(f"output/segmentation_results/simpsons_{split}.csv")
-mask_df = pd.read_csv(f"output/segmentation/deeplabv3_resnet50_pretrained/mask_coordinates_{split}.csv")
+major_axis_df = pd.read_csv(f"deepsimpson/output/features/simpsons_{split}.csv")
+mask_df = pd.read_csv(f"deepsimpson/output/segmentation/masks/mask_coordinates_{split}.csv")
 tracings = pd.read_csv(f"{cg.DATA_DIR}/VolumeTracings.csv")
 
-major_axis_df = pd.read_csv(f"output/segmentation_results/simpsons_{split}.csv")
-mask_df = pd.read_csv(f"output/segmentation_results/mask_coordinates_{split}.csv")
+major_axis_df = pd.read_csv(f"deepsimpson/output/features/simpsons_{split}.csv")
+# mask_df = pd.read_csv(f"deepsimpson/output/segmentation_results/mask_coordinates_{split}.csv")
 # Choose a video file to demonstrate
-file_name = "0X1002E8FBACD08477.avi"
+file_name = "0X1005D03EED19C65B.avi"
 frame_codes = list(tracings[tracings["FileName"] == file_name]["Frame"].unique())
 
 # Open the video
@@ -82,7 +86,7 @@ def plot_example(file, frame_codes):
         axs[idx, 2].legend(loc="upper right", fontsize=8, framealpha=0.7)
 
     plt.tight_layout(rect=[0, 0, 1, 0.93])
-    plt.savefig("output_images/echocardiography_mask_with_featuresdeneme.png", dpi=300)
+    plt.savefig("deepsimpson/output_images/echocardiography_mask_with_featuresdeneme.png", dpi=300)
     plt.close()
 
 # plot_example(file_name, frame_codes)

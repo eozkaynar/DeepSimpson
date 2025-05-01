@@ -28,7 +28,7 @@ import os
 @click.option(
     "--weights",
     type=click.Path(exists=True, dir_okay=False),
-    default="deepsimpson/output/segmentation/deeplabv3_resnet50_pretrained/best.pt",
+    default="/home/eda/Desktop/EF-Estimation-Paper-Imlementation/WorkingFolder/output/segmentation/deeplabv3_resnet50_pretrained/best.pt",
     show_default=True,
     help="Path to the pretrained model checkpoint."
 )

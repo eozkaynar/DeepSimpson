@@ -28,6 +28,7 @@ def clip_line_to_mask(x1, y1, x2, y2, mask, num_points=100):
     end_idx = inside_indices[-1]
 
     return (xs[start_idx], ys[start_idx]), (xs[end_idx], ys[end_idx])
+
 def savemajoraxis_with_simpson(results, output, split, num_discs=20, frame_btw_ed_es=True):
     """
     Extracts and saves perpendicular line segments (discs) along the major axis of each mask
@@ -53,11 +54,14 @@ def savemajoraxis_with_simpson(results, output, split, num_discs=20, frame_btw_e
             start_frame = 0
             end_frame = T
         total_frame_number  = 0   # Count unique frames saved
+
         for frame_idx in range(start_frame, end_frame):
             mask = logit[frame_idx] > 0
             if np.sum(mask) == 0:
                 continue  # Skip empty masks
+
             total_frame_number += 1  # Count each saved frame
+            
             # Determine phase label for the current frame
             if frame_idx == large_index:
                 phase = "ED_GT"
@@ -322,7 +326,7 @@ def find_major_axis_pca(mask):
     end_point = center + max_proj * major_axis_vector
 
     # Convert to (X, Y) format (swap row, col → x, y)
-    return (apex[1], apex[0]), (end_point[1], end_point[0]) 
+    return (apex[1], apex[0]), (end_point[1], end_point[0])
 
 def savemajoraxis(results, output, split):
     """
