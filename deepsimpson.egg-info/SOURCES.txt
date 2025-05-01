@@ -1,8 +1,0 @@
-README.md
-setup.py
-deepsimpson.egg-info/PKG-INFO
-deepsimpson.egg-info/SOURCES.txt
-deepsimpson.egg-info/dependency_links.txt
-deepsimpson.egg-info/entry_points.txt
-deepsimpson.egg-info/requires.txt
-deepsimpson.egg-info/top_level.txt
