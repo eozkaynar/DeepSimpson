@@ -6,27 +6,27 @@ from sklearn.decomposition import PCA
 import csv
 
 import matplotlib.pyplot as plt
-def clip_line_to_mask(x1, y1, x2, y2, mask, num_points=100):
-    """Return start and end of the total clipped segment (only one segment per line)."""
+
+def clip_line_to_mask(x1, y1, x2, y2, mask, num_points=50):
+    """Clips a line to the mask using vectorized numpy operations."""
     xs = np.linspace(x1, x2, num_points)
     ys = np.linspace(y1, y2, num_points)
 
     # Check which points are inside the mask
-    inside = [mask[int(round(y)), int(round(x))] > 0 
-              if 0 <= int(round(y)) < mask.shape[0] and 0 <= int(round(x)) < mask.shape[1] 
-              else False
-              for x, y in zip(xs, ys)]
+    xi = np.round(xs).astype(int)
+    yi = np.round(ys).astype(int)
+
+    valid = (0 <= xi) & (xi < mask.shape[1]) & (0 <= yi) & (yi < mask.shape[0])
 
     # Find indices where inside == True
-    inside_indices = [i for i, val in enumerate(inside) if val]
-
-    if not inside_indices:
-        return None  # No part of the line is inside the mask
+    inside = np.zeros_like(valid, dtype=bool)
+    inside[valid] = mask[yi[valid], xi[valid]] > 0
+    if not np.any(inside):
+        return None # No part of the line is inside the mask
 
     # Get start and end index of the entire masked segment
-    start_idx = inside_indices[0]
-    end_idx = inside_indices[-1]
-
+    start_idx = np.argmax(inside)
+    end_idx = len(inside) - np.argmax(inside[::-1]) - 1
     return (xs[start_idx], ys[start_idx]), (xs[end_idx], ys[end_idx])
 
 def savemajoraxis_with_simpson(results, output, split, num_discs=20, frame_btw_ed_es=True):
