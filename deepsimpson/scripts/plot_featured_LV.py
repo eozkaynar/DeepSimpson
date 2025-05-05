@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 import cv2 as cv
 import deepsimpson.config.config as cg
 
-split = "train"
+split = "test"
 # Load data
 major_axis_df = pd.read_csv(f"deepsimpson/output/features/simpsons_{split}.csv")
 mask_df = pd.read_csv(f"deepsimpson/output/segmentation/masks/mask_coordinates_{split}.csv")
@@ -18,7 +18,7 @@ tracings = pd.read_csv(f"{cg.DATA_DIR}/VolumeTracings.csv")
 major_axis_df = pd.read_csv(f"deepsimpson/output/features/simpsons_{split}.csv")
 # mask_df = pd.read_csv(f"deepsimpson/output/segmentation_results/mask_coordinates_{split}.csv")
 # Choose a video file to demonstrate
-file_name = "0X1005D03EED19C65B.avi"
+file_name = "0X100CF05D141FF143.avi"
 frame_codes = list(tracings[tracings["FileName"] == file_name]["Frame"].unique())
 
 # Open the video
