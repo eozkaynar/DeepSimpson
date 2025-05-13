@@ -1,7 +1,10 @@
-from EchoSegmentation import Echo
-from utils import compute_ef_histogram_weights
-from nn_models import LSTM, RNN
-from RNNDataset import Dataset
+import sys
+import os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
+from deepsimpson.datasets.EchoSegmentation import Echo
+from deepsimpson.models.sequence_models import LSTM, RNN
+# from deepsimpson.datasets.RNNDataset import Dataset
+from deepsimpson.datasets.LSTMDataset import Dataset_lstm
 
 import click
 import matplotlib.pyplot as plt
@@ -17,18 +20,18 @@ import time
 
 
 @click.command("segmentation")
-@click.option("--data_dir", type=click.Path(exists=True, file_okay=False), default="/home/eda/Desktop/EF-Estimation-Paper-Imlementation/WorkingFolder/output/segmentation/deeplabv3_resnet50_pretrained")
+@click.option("--data_dir", type=click.Path(exists=True, file_okay=False), default="/home/eda/Desktop/DeepSimpson/deepsimpson/output/features")
 @click.option("--output", type=click.Path(file_okay=False), default=None)
 @click.option("--model_name", type=click.Choice(["LSTM", "RNN"]), default="RNN")
 @click.option("--weights", type=click.Path(exists=True, dir_okay=False), default=None)
 @click.option("--run_test/--skip_test", default=True)
-@click.option("--num_epochs", type=int, default=85)
-@click.option("--lr", type=float, default=1e-3)
-@click.option("--weight_decay", type=float, default=1e-5)
+@click.option("--num_epochs", type=int, default=75)
+@click.option("--lr", type=float, default=1e-4)
+@click.option("--weight_decay", type=float, default=1e-4)
 @click.option("--lr_step_period", type=int, default=None)
 @click.option("--num_train_patients", type=int, default=None)
 @click.option("--num_workers", type=int, default=4)
-@click.option("--batch_size", type=int, default=64)
+@click.option("--batch_size", type=int, default=32)
 @click.option("--device", type=str, default=None)
 @click.option("--seed", type=int, default=0)
 
@@ -62,7 +65,7 @@ def run(
 
     # Set default output directory
     if output is None:
-        output = os.path.join("output", "prediction", "_{}".format(model_name))
+        output = os.path.join("deepsimpson/output", "prediction", "_{}".format(model_name))
     os.makedirs(output, exist_ok=True)
 
     # Set device for computations
@@ -91,19 +94,14 @@ def run(
 
     if lr_step_period is None:
         lr_step_period = math.inf
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="min", factor=0.1, patience=5, verbose=True)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="min", factor=0.1, patience=5)
 
     
     # Set up datasets and dataloaders
     dataset = {}
-    dataset["train"]    = Dataset(root=data_dir, split="train")
-    dataset["val"]      = Dataset(root=data_dir, split="val")
-    dataset["test"]     = Dataset(root=data_dir, split="test")
-
-    # Compute EF-based bin weights from training data
-    bin_edges, weights_per_bin = compute_ef_histogram_weights(
-    dataset["train"], bins=100, value_range=(0, 100)
-)
+    dataset["train"]    = Dataset_lstm(root=data_dir, split="train")
+    dataset["val"]      = Dataset_lstm(root=data_dir, split="val")
+    dataset["test"]     = Dataset_lstm(root=data_dir, split="test")
  
     # Run training and testing loops
     with open(os.path.join(output, "log.csv"), "a") as f:
@@ -136,9 +134,7 @@ def run(
                 dataloader  = torch.utils.data.DataLoader(
                     ds, batch_size=batch_size, num_workers=num_workers, shuffle=True, pin_memory=(device.type == "cuda"), drop_last=(phase == "train"))
                 
-                loss, yhat, y, filename = run_epoch(model, dataloader, phase, optimizer, device, train_losses, val_losses,output,bin_edges=bin_edges,
-    weights_per_bin=weights_per_bin) 
-
+                loss, yhat, y, filename = run_epoch(model, dataloader, phase, optimizer, device, train_losses, val_losses,output) 
                 f.write("{},{},{},{},{},{}\n".format(epoch,
                                                     phase,
                                                     loss,
@@ -170,34 +166,35 @@ def run(
 
         if run_test:
 
-            for split in ["val", "test"]:
-                dataset     = Dataset(root=data_dir, split=split)
+            for test_split in ["val", "test"]:
+                dataset     = Dataset_lstm(root=data_dir, split=test_split)
                 dataloader  = torch.utils.data.DataLoader(dataset, batch_size=batch_size, num_workers=num_workers, shuffle=False, pin_memory=(device.type == "cuda")) 
                                                                                                                  
-                loss, yhat, y, filename = run_epoch(model,dataloader,split,None, device,train_losses=[], val_losses=[], output=output)
+                loss, yhat, y, filename = run_epoch(model,dataloader,test_split,None, device,train_losses=[], val_losses=[], output=output)
 
-                with open(os.path.join(output, "{}_predictions.csv".format(split)), "w") as g:
+                with open(os.path.join(output, "{}_predictions.csv".format(test_split)), "w") as g:
                     g.write("filename,true_value,prediction\n")
                     for (file, pred, target) in zip(filename, yhat, y):
                             g.write("{},{:.4f},{:.4f}\n".format(file,float(target),float(pred)))
 
-                    g.write("{} R2:   {:.3f} \n".format(split, sklearn.metrics.r2_score(y, yhat)))
-                    g.write("{} MAE:  {:.4f} \n".format(split, sklearn.metrics.mean_absolute_error(y, yhat)))
-                    g.write("{} RMSE: {:.4f} \n".format(split, math.sqrt(sklearn.metrics.mean_squared_error(y, yhat))))
+                    g.write("{} R2:   {:.3f} \n".format(test_split, sklearn.metrics.r2_score(y, yhat)))
+                    g.write("{} MAE:  {:.4f} \n".format(test_split, sklearn.metrics.mean_absolute_error(y, yhat)))
+                    g.write("{} RMSE: {:.4f} \n".format(test_split, math.sqrt(sklearn.metrics.mean_squared_error(y, yhat))))
                     y = np.array(y)
                     yhat = np.array(yhat)
 
                     corr, _ = pearsonr(y.ravel(), yhat.ravel())
-                    g.write("{} Corr: {:.3f} \n".format(split, corr))
+                    g.write("{} Corr: {:.3f} \n".format(test_split, corr))
                     f.flush()
             
     np.save(os.path.join(output, "train_losses.npy"), np.array(train_losses))
     np.save(os.path.join(output, "val_losses.npy"), np.array(val_losses))
     print(f"Train and validation losses saved to {output}")
 
-def run_epoch(model, dataloader, split, optimizer, device, train_losses, val_losses,output,bin_edges=None,weights_per_bin=None):
+def run_epoch(model, dataloader, split, optimizer, device, train_losses, val_losses,output):
 
     total_loss = 0.
+    avg_loss   = 0
     n          = 0
     s1         = 0     # sum of ground truth EF
     s2         = 0     # Sum of ground truth EF squared
@@ -217,7 +214,6 @@ def run_epoch(model, dataloader, split, optimizer, device, train_losses, val_los
         with tqdm.tqdm(total=len(dataloader)) as pbar:
 
             for (filename, X, ejection) in dataloader:
-    
                 X = X.to(device)
                 ejection = ejection.to(device)
 
@@ -226,29 +222,23 @@ def run_epoch(model, dataloader, split, optimizer, device, train_losses, val_los
                 s2 += (ejection ** 2).sum()
                 
                 output  = model(X)
-                #  # === Weighted loss computation ===
-                # if split == 'train'and weights_per_bin is not None and bin_edges is not None:
-                #     # Inverse EF normalization for binning
-                #     ef_values = (ejection).detach().cpu().numpy()  # shape: (batch,)
+  
+              #     # Standard MSE loss
+                # loss = torch.nn.functional.mse_loss(output.view(-1), ejection)
+                weights = torch.ones_like(ejection, device=ejection.device)
+                weights[ejection >= 70.0] = 4        # eşik ve katsayı ayarlanabilir
+                weights[ejection < 30] = 2
+                weights[(ejection >= 30) & (ejection < 50)] = 1
 
-                #     # Get bin indices (length = bins - 1)
-                #     bin_indices = np.digitize(ef_values, bins=bin_edges[1:-1])
-                #     bin_indices = np.clip(bin_indices, 0, len(weights_per_bin) - 1)
+                # 2) Element-wise MSE (reduction='none')
+                per_sample_loss = torch.nn.functional.mse_loss(
+                                    output.view(-1), ejection, reduction='none')
 
-                #     # Get weight for each sample
-                #     sample_weights = weights_per_bin[bin_indices]
-                #     sample_weights = torch.tensor(sample_weights, dtype=torch.float32).to(device)
-
-                #     # Compute per-sample loss, apply weights
-                #     loss_per_sample = torch.nn.functional.mse_loss(output.view(-1), ejection, reduction='none')
-                #     loss = (loss_per_sample * sample_weights).mean()
-                # else:
-                #     # Standard MSE loss
-                loss = torch.nn.functional.mse_loss(output.view(-1), ejection)
-
+                # 3) Ağırlıkla çarpıp ortalama al
+                loss = (weights * per_sample_loss).mean()
                 
-    
-                
+
+            
             
                 # Graidient for training
                 if train_flag:
