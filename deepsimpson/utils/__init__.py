@@ -7,7 +7,7 @@ import csv
 
 import matplotlib.pyplot as plt
 
-def clip_line_to_mask(x1, y1, x2, y2, mask, num_points=50):
+def clip_line_to_mask(x1, y1, x2, y2, mask, num_points=100):
     """Clips a line to the mask using vectorized numpy operations."""
     xs = np.linspace(x1, x2, num_points)
     ys = np.linspace(y1, y2, num_points)
@@ -29,43 +29,78 @@ def clip_line_to_mask(x1, y1, x2, y2, mask, num_points=50):
     end_idx = len(inside) - np.argmax(inside[::-1]) - 1
     return (xs[start_idx], ys[start_idx]), (xs[end_idx], ys[end_idx])
 
-def savemajoraxis_with_simpson(results, output, split, num_discs=20, frame_btw_ed_es=True):
+def savemajoraxis_with_simpson(
+        results,
+        output,
+        split,
+        num_discs: int = 20,
+        type: str = "one-cycle"        # {'one-cycle', 'full', 'ed-es'}
+):
     """
-    Extracts and saves perpendicular line segments (discs) along the major axis of each mask
-    using PCA and clips them to stay within the segmented region.
-    Output is written in CSV format for Simpson's rule integration.
-    """
+    Save major-axis segments and perpendicular Simpson’s-rule discs for each mask.
 
-    output_path         = os.path.join(output, f"simpsons_{split}.csv")
-    buffer              = []  # Buffer to hold all rows before writing
-    
+    Parameters
+    ----------
+    results : list
+        Items of the form
+        (filename, logit_mask, _, systole_frames, diastole_frames,
+         ed_index, es_index).
+    output : str
+        Root directory for CSV output.
+    split : str
+        Dataset split name (train / val / test) – appears in the file name.
+    num_discs : int, default=20
+        Number of equally spaced Simpson discs drawn along the axis.
+    type : {'one-cycle', 'full', 'ed-es'}, default='one-cycle'
+        * 'one-cycle' – only the first cardiac cycle between ED and ES.
+        * 'full'      – every frame in the video.
+        * 'ed-es'     – **only** ED / ES frames (GT and predicted).
+    """
+    output_path = os.path.join(output, f"simpsons_{split}.csv")
+    buffer = []                                          # rows to write at the end
+
     for entry in results:
         if len(entry) != 7:
-            print(f"[WARNING] Unrecognized format in savemajoraxis_with_simpson():")
+            print("[WARNING] Unexpected entry format – skipping.")
             continue
 
-        filename, logit, _, systole, diastole, large_index, small_index = entry
-        T = logit.shape[0]  # Number of frames in the video
+        filename, logit, _, systole, diastole, ed_idx, es_idx = entry
+        T = logit.shape[0]                               # total frame count
 
-        if frame_btw_ed_es:
-            start_frame =  min(large_index, small_index)
-            end_frame   = max(large_index, small_index) + 1  # +1 for inclusive range
-        else:
-            start_frame = 0
-            end_frame = T
-        total_frame_number  = 0   # Count unique frames saved
+        # ------------------------------------------------------------------
+        # Decide which frames are allowed according to `type`
+        # ------------------------------------------------------------------
+        if type == "one-cycle":
+            start_frame = min(ed_idx, es_idx)
+            end_frame = max(ed_idx, es_idx) + 1          # inclusive range
+            allowed_frames = None                        # everything in [start, end)
+        elif type == "ed-es":
+            # Only ED and ES frames (GT + predicted)
+            allowed_frames = set([ed_idx, es_idx]) | set(diastole) | set(systole)
+            start_frame, end_frame = 0, T                # iterate over all, filter below
+        else:   # 'full'
+            start_frame, end_frame = 0, T
+            allowed_frames = None
 
+        total_frame_number = 0                           # unique frames saved
+
+        # ------------------------------------------------------------------
+        # Iterate through the chosen frame range
+        # ------------------------------------------------------------------
         for frame_idx in range(start_frame, end_frame):
-            mask = logit[frame_idx] > 0
-            if np.sum(mask) == 0:
-                continue  # Skip empty masks
+            if allowed_frames is not None and frame_idx not in allowed_frames:
+                continue                                 # skip frames we do not want
 
-            total_frame_number += 1  # Count each saved frame
-            
-            # Determine phase label for the current frame
-            if frame_idx == large_index:
+            mask = logit[frame_idx] > 0
+            if mask.sum() == 0:
+                continue                                 # skip empty masks
+
+            total_frame_number += 1
+
+            # Assign a phase label for this frame
+            if frame_idx == ed_idx:
                 phase = "ED_GT"
-            elif frame_idx == small_index:
+            elif frame_idx == es_idx:
                 phase = "ES_GT"
             elif frame_idx in diastole:
                 phase = "ED"
@@ -74,46 +109,54 @@ def savemajoraxis_with_simpson(results, output, split, num_discs=20, frame_btw_e
             else:
                 phase = "ALL"
 
-            # Perform PCA to determine the major axis of the mask
+            # ---------------- Major axis via PCA --------------------------
             result = find_major_axis_pca(mask)
             if result[0] is None:
-                continue
+                continue                                 # degenerate mask
 
-            (start_x, start_y), (end_x, end_y) = result
-            buffer.append([filename, phase, frame_idx, start_x, start_y, end_x, end_y, total_frame_number,"Major Axis"])
-            # Compute direction and perpendicular vectors
-            axis_vector = np.array([end_x - start_x, end_y - start_y])
-            if not axis_vector.any():
-                continue  # Skip degenerate cases earlier
+            (sx, sy), (ex, ey) = result
+            buffer.append([filename, phase, frame_idx,
+                           sx, sy, ex, ey,
+                           total_frame_number, "Major Axis"])
 
-            axis_length = np.linalg.norm(axis_vector)
-            unit_vector = axis_vector / axis_length
-            perp_vector = np.array([-unit_vector[1], unit_vector[0]])  # Rotate 90° CCW
+            # Axis direction vectors
+            axis_vec = np.array([ex - sx, ey - sy])
+            if not axis_vec.any():
+                continue                                 # zero-length axis
 
-            # Generate evenly spaced perpendicular segments along the axis
+            axis_len = np.linalg.norm(axis_vec)
+            unit_vec = axis_vec / axis_len
+            perp_vec = np.array([-unit_vec[1], unit_vec[0]])  # 90° CCW
+
+            # ---------------- Simpson discs along the axis ---------------
             for i in range(num_discs):
                 t = i / (num_discs - 1)
-                midpoint_x = start_x + t * axis_vector[0]
-                midpoint_y = start_y + t * axis_vector[1]
+                mx = sx + t * axis_vec[0]                # disc midpoint (x)
+                my = sy + t * axis_vec[1]                # disc midpoint (y)
 
-                # Define endpoints of the perpendicular line (disc)
-                line_length = axis_length * 0.5
-                line_start_x = midpoint_x - perp_vector[0] * line_length
-                line_start_y = midpoint_y - perp_vector[1] * line_length
-                line_end_x   = midpoint_x + perp_vector[0] * line_length
-                line_end_y   = midpoint_y + perp_vector[1] * line_length
+                disc_half_len = axis_len * 0.5
+                lx0 = mx - perp_vec[0] * disc_half_len
+                ly0 = my - perp_vec[1] * disc_half_len
+                lx1 = mx + perp_vec[0] * disc_half_len
+                ly1 = my + perp_vec[1] * disc_half_len
 
-                # Clip the disc to the inside of the mask
-                clipped = clip_line_to_mask(line_start_x, line_start_y, line_end_x, line_end_y, mask)
+                clipped = clip_line_to_mask(lx0, ly0, lx1, ly1, mask)
                 if clipped is not None:
-                    (sx, sy), (ex, ey) = clipped
-                    buffer.append([filename, phase, frame_idx, sx, sy, ex, ey,"","Simpson's Disc"])
+                    (cx0, cy0), (cx1, cy1) = clipped
+                    buffer.append([filename, phase, frame_idx,
+                                   cx0, cy0, cx1, cy1,
+                                   "", "Simpson's Disc"])
 
-    # Write everything at once after processing
+    # ----------------------------------------------------------------------
+    # Write everything once at the end (faster than per-frame I/O)
+    # ----------------------------------------------------------------------
     with open(output_path, "w", newline="") as f:
         writer = csv.writer(f)
-        writer.writerow(["Filename", "Phase", "Frame", "Start_X", "Start_Y", "End_X", "End_Y","Frames","Type"])
+        writer.writerow(["Filename", "Phase", "Frame",
+                         "Start_X", "Start_Y", "End_X", "End_Y",
+                         "Frames", "Type"])
         writer.writerows(buffer)
+
 
 
 def plot_size_curve(filename, size, systole, diastole, output_dir=None, show=False):
