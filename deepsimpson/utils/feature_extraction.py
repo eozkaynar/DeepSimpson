@@ -138,7 +138,7 @@ def run(
                 # savesize(results,output,split)
                 # savemajoraxis(results,output,split)
                 # savemask(results,output,split)
-                savemajoraxis_with_simpson(results, output, split, num_discs=20)
+                savemajoraxis_with_simpson(results, output, split, num_discs=20, type="ed-es")
 
 
 def _video_collate_fn(x):
