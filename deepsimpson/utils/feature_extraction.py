@@ -84,8 +84,7 @@ def run(
 
  
                                     
-    # for split in ["train","val", "test"]:   
-    for split in [ "train", "val"]:      
+    for split in [ "train", "val", "test"]:      
         # Saving videos with segmentations
         dataset = Echo(root=data_dir, split=split,
                                         mean=mean, std=std,  # Normalization
