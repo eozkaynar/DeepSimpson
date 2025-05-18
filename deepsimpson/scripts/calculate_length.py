@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import os
 
-output = "deepsimpson/output/features/simpsons.csv"
+output = "deepsimpson/output/features/simpsons_ed_es.csv"
 filelist = pd.read_csv("/home/eda/Desktop/dynamic/EchoNet-Dynamic/FileList.csv")
 
 # Add "avi"

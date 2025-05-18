@@ -21,17 +21,17 @@ import time
 
 @click.command("segmentation")
 @click.option("--data_dir", type=click.Path(exists=True, file_okay=False), default="/home/eda/Desktop/DeepSimpson/deepsimpson/output/features")
-@click.option("--output", type=click.Path(file_okay=False), default=None)
+@click.option("--output_path", type=click.Path(file_okay=False), default=None)
 @click.option("--model_name", type=click.Choice(["LSTM", "RNN"]), default="RNN")
 @click.option("--weights", type=click.Path(exists=True, dir_okay=False), default=None)
 @click.option("--run_test/--skip_test", default=True)
-@click.option("--num_epochs", type=int, default=75)
-@click.option("--lr", type=float, default=1e-4)
-@click.option("--weight_decay", type=float, default=1e-4)
+@click.option("--num_epochs", type=int, default=85)
+@click.option("--lr", type=float, default=1e-3)
+@click.option("--weight_decay", type=float, default=1e-5)
 @click.option("--lr_step_period", type=int, default=None)
 @click.option("--num_train_patients", type=int, default=None)
 @click.option("--num_workers", type=int, default=4)
-@click.option("--batch_size", type=int, default=32)
+@click.option("--batch_size", type=int, default=64)
 @click.option("--device", type=str, default=None)
 @click.option("--seed", type=int, default=0)
 
@@ -40,7 +40,7 @@ import time
 
 def run(
     data_dir=None,
-    output=None,
+    output_path=None,
     model_name="LSTM",
     weights=None,
 
@@ -64,9 +64,9 @@ def run(
     torch.manual_seed(seed)
 
     # Set default output directory
-    if output is None:
-        output = os.path.join("deepsimpson/output", "prediction", "_{}".format(model_name))
-    os.makedirs(output, exist_ok=True)
+    if output_path is None:
+        output_path = os.path.join("deepsimpson/output", "prediction", "_{}".format(model_name))
+    os.makedirs(output_path, exist_ok=True)
 
     # Set device for computations
     if device is None:
@@ -90,7 +90,7 @@ def run(
     if model_name == "LSTM":
         optimizer= torch.optim.SGD(model.parameters(), lr=lr, momentum=0.9, weight_decay=weight_decay)
     elif model_name == "RNN":
-        optimizer= torch.optim.Adam(model.parameters(), lr=lr)
+        optimizer= torch.optim.Adam(model.parameters(), lr=lr,weight_decay=weight_decay)
 
     if lr_step_period is None:
         lr_step_period = math.inf
@@ -104,12 +104,12 @@ def run(
     dataset["test"]     = Dataset_lstm(root=data_dir, split="test")
  
     # Run training and testing loops
-    with open(os.path.join(output, "log.csv"), "a") as f:
+    with open(os.path.join(output_path, "log.csv"), "a") as f:
         epoch_resume = 0
         bestLoss = float("inf")
         try:
             # Attempt to load checkpoint
-            checkpoint = torch.load(os.path.join(output, "checkpoint.pt"))
+            checkpoint = torch.load(os.path.join(output_path, "checkpoint.pt"))
             model.load_state_dict(checkpoint['state_dict'])
             optimizer.load_state_dict(checkpoint['opt_dict'])
             scheduler.load_state_dict(checkpoint['scheduler_dict'])
@@ -134,7 +134,7 @@ def run(
                 dataloader  = torch.utils.data.DataLoader(
                     ds, batch_size=batch_size, num_workers=num_workers, shuffle=True, pin_memory=(device.type == "cuda"), drop_last=(phase == "train"))
                 
-                loss, yhat, y, filename = run_epoch(model, dataloader, phase, optimizer, device, train_losses, val_losses,output) 
+                loss, yhat, y, filename = run_epoch(model, dataloader, phase, optimizer, device, train_losses, val_losses,output_path) 
                 f.write("{},{},{},{},{},{}\n".format(epoch,
                                                     phase,
                                                     loss,
@@ -153,14 +153,14 @@ def run(
                 'opt_dict': optimizer.state_dict(),
                 'scheduler_dict': scheduler.state_dict(),
             }
-            torch.save(save, os.path.join(output, "checkpoint.pt"))
+            torch.save(save, os.path.join(output_path, "checkpoint.pt"))
             if loss < bestLoss:
-                torch.save(save, os.path.join(output, "best.pt"))
+                torch.save(save, os.path.join(output_path, "best.pt"))
                 bestLoss = loss
 
         # Load best weights
         if num_epochs != 0:
-            checkpoint = torch.load(os.path.join(output, "best.pt"))
+            checkpoint = torch.load(os.path.join(output_path, "best.pt"))
             model.load_state_dict(checkpoint['state_dict'])
             f.write("Best validation loss {} from epoch {}\n".format(checkpoint["loss"], checkpoint["epoch"]))
 
@@ -170,9 +170,9 @@ def run(
                 dataset     = Dataset_lstm(root=data_dir, split=test_split)
                 dataloader  = torch.utils.data.DataLoader(dataset, batch_size=batch_size, num_workers=num_workers, shuffle=False, pin_memory=(device.type == "cuda")) 
                                                                                                                  
-                loss, yhat, y, filename = run_epoch(model,dataloader,test_split,None, device,train_losses=[], val_losses=[], output=output)
+                loss, yhat, y, filename = run_epoch(model,dataloader,test_split,None, device,train_losses=[], val_losses=[], output_path=output_path)
 
-                with open(os.path.join(output, "{}_predictions.csv".format(test_split)), "w") as g:
+                with open(os.path.join(output_path, "{}_predictions.csv".format(test_split)), "w") as g:
                     g.write("filename,true_value,prediction\n")
                     for (file, pred, target) in zip(filename, yhat, y):
                             g.write("{},{:.4f},{:.4f}\n".format(file,float(target),float(pred)))
@@ -187,17 +187,15 @@ def run(
                     g.write("{} Corr: {:.3f} \n".format(test_split, corr))
                     f.flush()
             
-    np.save(os.path.join(output, "train_losses.npy"), np.array(train_losses))
-    np.save(os.path.join(output, "val_losses.npy"), np.array(val_losses))
-    print(f"Train and validation losses saved to {output}")
+    np.save(os.path.join(output_path, "train_losses.npy"), np.array(train_losses))
+    np.save(os.path.join(output_path, "val_losses.npy"), np.array(val_losses))
+    print(f"Train and validation losses saved to {output_path}")
 
-def run_epoch(model, dataloader, split, optimizer, device, train_losses, val_losses,output):
+def run_epoch(model, dataloader, split, optimizer, device, train_losses, val_losses,output_path):
 
     total_loss = 0.
     avg_loss   = 0
     n          = 0
-    s1         = 0     # sum of ground truth EF
-    s2         = 0     # Sum of ground truth EF squared
 
     yhat       = []
     y          = []
@@ -224,18 +222,18 @@ def run_epoch(model, dataloader, split, optimizer, device, train_losses, val_los
                 output  = model(X)
   
               #     # Standard MSE loss
-                # loss = torch.nn.functional.mse_loss(output.view(-1), ejection)
-                weights = torch.ones_like(ejection, device=ejection.device)
-                weights[ejection >= 70.0] = 4        # eşik ve katsayı ayarlanabilir
-                weights[ejection < 30] = 2
-                weights[(ejection >= 30) & (ejection < 50)] = 1
+                loss = torch.nn.functional.mse_loss(output.view(-1), ejection)
+                # weights = torch.ones_like(ejection, device=ejection.device)
+                # weights[ejection >= 70.0] = 4        # eşik ve katsayı ayarlanabilir
+                # weights[ejection < 30] = 2
+                # weights[(ejection >= 30) & (ejection < 50)] = 1
 
                 # 2) Element-wise MSE (reduction='none')
                 per_sample_loss = torch.nn.functional.mse_loss(
                                     output.view(-1), ejection, reduction='none')
 
                 # 3) Ağırlıkla çarpıp ortalama al
-                loss = (weights * per_sample_loss).mean()
+                # loss = (weights * per_sample_loss).mean()
                 
 
             
