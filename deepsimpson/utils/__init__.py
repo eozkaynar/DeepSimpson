@@ -48,20 +48,20 @@ def savemajoraxis_with_simpson(
     output : str
         Root directory for CSV output.
     split : str
-        Dataset split name (train / val / test) – appears in the file name.
+        Dataset split name (train / val / test)  appears in the file name.
     num_discs : int, default=20
         Number of equally spaced Simpson discs drawn along the axis.
     type : {'one-cycle', 'full', 'ed-es'}, default='one-cycle'
-        * 'one-cycle' – only the first cardiac cycle between ED and ES.
-        * 'full'      – every frame in the video.
-        * 'ed-es'     – **only** ED / ES frames (GT and predicted).
+        * 'one-cycle'  only the first cardiac cycle between ED and ES.
+        * 'full'       every frame in the video.
+        * 'ed-es'      **only** ED / ES frames (GT and predicted).
     """
     output_path = os.path.join(output, f"simpsons_{split}.csv")
     buffer = []                                          # rows to write at the end
 
     for entry in results:
         if len(entry) != 7:
-            print("[WARNING] Unexpected entry format – skipping.")
+            print("[WARNING] Unexpected entry format skipping.")
             continue
 
         filename, logit, _, systole, diastole, ed_idx, es_idx = entry
@@ -98,11 +98,11 @@ def savemajoraxis_with_simpson(
             total_frame_number += 1
 
             # Assign a phase label for this frame
-            if frame_idx == ed_idx:
-                phase = "ED_GT"
-            elif frame_idx == es_idx:
-                phase = "ES_GT"
-            elif frame_idx in diastole:
+            # if frame_idx == ed_idx:
+                # phase = "ED_GT"
+            # elif frame_idx == es_idx:
+                # phase = "ES_GT"
+            if frame_idx in diastole:
                 phase = "ED"
             elif frame_idx in systole:
                 phase = "ES"
