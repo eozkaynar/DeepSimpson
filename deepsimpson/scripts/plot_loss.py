@@ -13,8 +13,8 @@ for model_name, settings in models.items():
     skip_first = settings["skip_first_loss"]
 
     # Load losses
-    train_losses = np.load(f"deepsimpson/output/prediction/_{model_name}/train_losses.npy")
-    val_losses   = np.load(f"deepsimpson/output/prediction/_{model_name}/val_losses.npy")
+    train_losses = np.load(f"deepsimpson/output/prediction/ED_ES_{model_name}/train_losses.npy")
+    val_losses   = np.load(f"deepsimpson/output/prediction/ED_ES_{model_name}/val_losses.npy")
 
     if skip_first:
         train_losses = train_losses[1:]
@@ -55,7 +55,7 @@ for model_name, settings in models.items():
     plt.grid(True)
     plt.legend(loc='lower right')
     plt.tight_layout()
-    plt.savefig(f"deepsimpson/output_images/EF_plot_with_risk_zones_{model_name}.png")
+    plt.savefig(f"deepsimpson/output_images/EF_plot_with_risk_zones_{model_name}_ED_ES.png")
     plt.show()
 
     # Training/Validation Loss Plot
@@ -68,5 +68,5 @@ for model_name, settings in models.items():
     plt.legend()
     plt.grid(True)
     plt.tight_layout()
-    plt.savefig(f"deepsimpson/output_images/training_validation_loss_plot_{model_name}.png")
+    plt.savefig(f"deepsimpson/output_images/training_validation_loss_plot_{model_name}_ED_ES.png")
     plt.show()

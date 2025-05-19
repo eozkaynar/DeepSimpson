@@ -22,10 +22,10 @@ import time
 @click.command("segmentation")
 @click.option("--data_dir", type=click.Path(exists=True, file_okay=False), default="/home/eda/Desktop/DeepSimpson/deepsimpson/output/features")
 @click.option("--output_path", type=click.Path(file_okay=False), default=None)
-@click.option("--model_name", type=click.Choice(["LSTM", "RNN"]), default="RNN")
+@click.option("--model_name", type=click.Choice(["LSTM", "RNN"]), default="LSTM")
 @click.option("--weights", type=click.Path(exists=True, dir_okay=False), default=None)
 @click.option("--run_test/--skip_test", default=True)
-@click.option("--num_epochs", type=int, default=85)
+@click.option("--num_epochs", type=int, default=150)
 @click.option("--lr", type=float, default=1e-3)
 @click.option("--weight_decay", type=float, default=1e-5)
 @click.option("--lr_step_period", type=int, default=None)
@@ -65,7 +65,7 @@ def run(
 
     # Set default output directory
     if output_path is None:
-        output_path = os.path.join("deepsimpson/output", "prediction", "_{}".format(model_name))
+        output_path = os.path.join("deepsimpson/output", "prediction", "ED_ES_{}".format(model_name))
     os.makedirs(output_path, exist_ok=True)
 
     # Set device for computations
@@ -196,6 +196,8 @@ def run_epoch(model, dataloader, split, optimizer, device, train_losses, val_los
     total_loss = 0.
     avg_loss   = 0
     n          = 0
+    s1 =0
+    s2 =0
 
     yhat       = []
     y          = []
