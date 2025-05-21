@@ -25,13 +25,13 @@ import time
 @click.option("--model_name", type=click.Choice(["LSTM", "RNN"]), default="LSTM")
 @click.option("--weights", type=click.Path(exists=True, dir_okay=False), default=None)
 @click.option("--run_test/--skip_test", default=True)
-@click.option("--num_epochs", type=int, default=150)
+@click.option("--num_epochs", type=int, default=100)
 @click.option("--lr", type=float, default=1e-3)
-@click.option("--weight_decay", type=float, default=1e-5)
+@click.option("--weight_decay", type=float, default=1e-4)
 @click.option("--lr_step_period", type=int, default=None)
 @click.option("--num_train_patients", type=int, default=None)
 @click.option("--num_workers", type=int, default=4)
-@click.option("--batch_size", type=int, default=64)
+@click.option("--batch_size", type=int, default=32)
 @click.option("--device", type=str, default=None)
 @click.option("--seed", type=int, default=0)
 
@@ -65,7 +65,7 @@ def run(
 
     # Set default output directory
     if output_path is None:
-        output_path = os.path.join("deepsimpson/output", "prediction", "ED_ES_{}".format(model_name))
+        output_path = os.path.join("deepsimpson/output", "prediction", "{}".format(model_name))
     os.makedirs(output_path, exist_ok=True)
 
     # Set device for computations
