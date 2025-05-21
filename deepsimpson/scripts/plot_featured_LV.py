@@ -9,18 +9,19 @@ import matplotlib.pyplot as plt
 import cv2 as cv
 import deepsimpson.config.config as cg
 
-split = "test"
+split = "train"
 # Load data
 major_axis_df = pd.read_csv(f"deepsimpson/output/features/simpsons_{split}.csv")
 mask_df = pd.read_csv(f"deepsimpson/output/segmentation/masks/mask_coordinates_{split}.csv")
 tracings = pd.read_csv(f"{cg.DATA_DIR}/VolumeTracings.csv")
 
-major_axis_df = pd.read_csv(f"deepsimpson/output/features/simpsons_{split}.csv")
+major_axis_df = pd.read_csv(f"/home/eda/Desktop/DeepSimpson/deepsimpson/output/features/simpsons_ed_es.csv")
 # mask_df = pd.read_csv(f"deepsimpson/output/segmentation_results/mask_coordinates_{split}.csv")
 # Choose a video file to demonstrate
-file_name = "0X100CF05D141FF143.avi"
-frame_codes = list(tracings[tracings["FileName"] == file_name]["Frame"].unique())
+file_name = "0X1F97C88FCA1837FC.avi"
+# frame_codes = list(tracings[tracings["FileName"] == file_name]["Frame"].unique())
 
+frame_codes = [46,55]
 # Open the video
 vid_cap = cv.VideoCapture(f"{cg.DATA_DIR}/Videos/{file_name}")
 total_frames = int(vid_cap.get(cv.CAP_PROP_FRAME_COUNT))
@@ -86,7 +87,7 @@ def plot_example(file, frame_codes):
         axs[idx, 2].legend(loc="upper right", fontsize=8, framealpha=0.7)
 
     plt.tight_layout(rect=[0, 0, 1, 0.93])
-    plt.savefig("deepsimpson/output_images/echocardiography_mask_with_featuresdeneme.png", dpi=300)
+    plt.savefig("deepsimpson/output_images/echocardiography_mask_with_features_0X1F97C88FCA1837FC.png", dpi=300)
     plt.close()
 
 # plot_example(file_name, frame_codes)

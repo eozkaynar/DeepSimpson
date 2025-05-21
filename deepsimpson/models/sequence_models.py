@@ -65,24 +65,3 @@ class LSTM(nn.Module):
         out = out[:, -1, :]  # shape: (batch_size, hidden_size)
         out = self.fc(out)
         return out
-        
-
-    # def forward(self, x):
-    #     #  Set initial hidden states and cell state
-    #     h0 = torch.zeros(1, x.size(0), self.hidden_size, device=x.device)
-    #     c0 = torch.zeros(1, x.size(0), self.hidden_size, device=x.device)
-    #     out, _ = self.lstm1(x, (h0, c0))
-
-    #     h1 = torch.zeros(1, x.size(0), 32, device=x.device)
-    #     c1 = torch.zeros(1, x.size(0), 32, device=x.device)
-    #     out, _ = self.lstm2(out, (h1, c1))
-
-    #     h2 = torch.zeros(1, x.size(0), 16, device=x.device)
-    #     c2 = torch.zeros(1, x.size(0), 16, device=x.device)
-    #     out, _ = self.lstm3(out, (h2, c2))
-    #     out    = out[:,-1,:]     # Only last time step
-
-    #     out    = self.fc(out)
-        
-
-    #     return out  
