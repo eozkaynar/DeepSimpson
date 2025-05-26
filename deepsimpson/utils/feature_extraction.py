@@ -102,7 +102,7 @@ def run(
         with torch.no_grad():
             # Run segmentation model once for all videos
             results = []
-            for (x, (filenames, large_index, small_index, _, _, _, _, _, _, _,_,_,_,_), length) in tqdm.tqdm(dataloader):
+            for (x, (filenames, large_index, small_index, _, _, _, _, _, _, _), length) in tqdm.tqdm(dataloader):
                 y = np.concatenate([
                     model(x[i:(i + batch_size), :, :, :].to(device))["out"].detach().cpu().numpy()
                     for i in range(0, x.shape[0], batch_size)
