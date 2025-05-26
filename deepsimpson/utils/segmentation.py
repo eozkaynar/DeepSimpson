@@ -283,7 +283,7 @@ def run_epoch(model, dataloader, split, optimizer, device, train_losses, val_los
     with torch.set_grad_enabled(train_flag):
         with tqdm.tqdm(total=len(dataloader)) as pbar:
 
-            for (_, (filename, ed_frame_idx, es_frame_idx, ed_frame_img, es_frame_img, ed_trace_mask, es_trace_mask, ef_value, edv_value, esv_value,ed_mitral_x,ed_mitral_y, es_mitral_x, es_mitral_y)) in dataloader:
+            for (_, (filename, ed_frame_idx, es_frame_idx, ed_frame_img, es_frame_img, ed_trace_mask, es_trace_mask, ef_value, edv_value, esv_value)) in dataloader:
     
                 # Count number of pixels in and out of segmentation
                 pos += (ed_trace_mask == 1).sum().item()
