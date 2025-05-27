@@ -12,9 +12,12 @@ class Dataset_lstm(torch.utils.data.Dataset):
         self.std     = std
         self.samples = [] 
         # Read csv
-        file_list_path  = os.path.join(self.root, "fixed_frame.csv")
+        file_list_path  = self.root
         data            = pd.read_csv(file_list_path)
-
+        
+        if "Split" not in data.columns:
+            data["Split"] = "EXT"
+            data["EF"]    = 0 
         # Normalize the 'Split' column to uppercase
         data["Split"]   = data["Split"].str.upper()
 
