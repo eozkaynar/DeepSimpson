@@ -11,16 +11,18 @@ import pandas   as pd
 
 class Echo(torchvision.datasets.VisionDataset):
 
-    def __init__(self, root=None, split="train", mean=0., std=1., length=16, period=2, max_length=250, clips=1):
+    def __init__(self, root=None, split="train", mean=0., std=1., length=16, period=2, max_length=250, clips=1, external_data_dir=None):
         super().__init__(root)
 
-        self.split = split.upper()
-        self.mean = mean
-        self.std = std
-        self.length = length
-        self.period = period
+        self.split      = split.upper()
+        self.mean       = mean
+        self.std        = std
+        self.length     = length
+        self.period     = period
         self.max_length = max_length
-        self.clips = clips
+        self.clips      = clips
+        
+        self.external_data_dir = external_data_dir
 
          # Initialize attributes
         self.fnames     = []
@@ -33,12 +35,17 @@ class Echo(torchvision.datasets.VisionDataset):
         # Load dataset components
         self.load_video_labels()
         self.check_missing_videos()
-        self.load_traces()  
-        self.filter_videos_with_traces()
+        # Load and filter traces for labeled data only
+        if self.split not in ("EXTERNAL_TEST","EXT"):
+            self.load_traces()  
+            self.filter_videos_with_traces()
 
     def __getitem__(self, index):
 
-        video = os.path.join(self.root, "Videos", self.fnames[index])
+        if self.split in ("EXTERNAL_TEST","EXT"):
+            video = os.path.join(self._external_dir, self.fnames[index])
+        else:
+            video = os.path.join(self.root, "Videos", self.fnames[index])
 
         # Load video into np.array
         video = loadvideo(video).astype(np.float32) 
@@ -89,84 +96,96 @@ class Echo(torchvision.datasets.VisionDataset):
         # Gather targets (Extract relevant information for training/testing)
         target = []
 
-        # Retrieve the filename of the current video
-        file_name = self.fnames[index]
-        target.append(self.fnames[index])  # Append the filename to the target list
+        if self.split in ("EXTERNAL_TEST", "EXT"):
+            ed_idx = es_idx = -1          # -1: mevcut değil
+            ed_frame = es_frame = None
+            ed_mask = es_mask = np.zeros((h, w), np.float32)
+            ef = edv = esv = np.nan
+            # Retrieve the filename of the current video
+            file_name = self.fnames[index]
+            target.append(file_name)  # Append the filename to the target list
+            # Append ED & ES frame indices to the target list
+            target.append(ed_idx)
+            target.append(es_idx)
+            # Append the actual ED and ES frame images from the video
+            target.append(ed_frame)  # Add the End-Diastolic frame
+            target.append(es_frame)  # Add the End-Systolic frame
+            target.append(ed_mask)  # Append the generated mask to the target list
+            target.append(es_mask)  # Append the generated mask to the target list
 
-        # Retrieve the frame index for End-Diastolic (ED) and End-Systolic (ES) frames
-        es_index = int(self.frames[file_name][-1])  # ES Frame: Last frame in the sorted traces
-        ed_index = int(self.frames[file_name][0])   # ED Frame: First frame in the sorted traces
+            # Append clinical measurements (Ejection Fraction, End-Diastolic Volume, End-Systolic Volume)
+            target.append(ef)   #  Append EF value
+            target.append(edv)  #  Append EDV value
+            target.append(esv)  #  Append ESV value
+        else:
+            # Retrieve the filename of the current video
+            file_name = self.fnames[index]
+            target.append(self.fnames[index])  # Append the filename to the target list
 
-        # Append ED & ES frame indices to the target list
-        target.append(ed_index)
-        target.append(es_index)
+            # Retrieve the frame index for End-Diastolic (ED) and End-Systolic (ES) frames
+            es_index = int(self.frames[file_name][-1])  # ES Frame: Last frame in the sorted traces
+            ed_index = int(self.frames[file_name][0])   # ED Frame: First frame in the sorted traces
 
-
-        # Append the actual ED and ES frame images from the video
-        target.append(video[:, ed_index, :, :])  # Add the End-Diastolic frame
-        target.append(video[:, es_index, :, :])  # Add the End-Systolic frame
-
-        # Retrieve the traced contour points for the End-Diastolic (ED) and End-Systolic (ES) frames
-        large_trace = self.trace[file_name][self.frames[file_name][-1]]  # ED frame trace (largest frame)
-        small_trace = self.trace[file_name][self.frames[file_name][0]]   # ES frame trace (smallest frame)
-
-        # -------------------------- Large Trace (ED Frame) Processing --------------------------
-
-        # Extract x and y coordinates from the traced contour
-        x1, y1, x2, y2 = large_trace[:, 0], large_trace[:, 1], large_trace[:, 2], large_trace[:, 3]
-
-        # Concatenate x and y coordinates to form a closed contour
-        x = np.concatenate((x1[1:], np.flip(x2[1:])))  # Flip ensures the contour closes properly
-        y = np.concatenate((y1[1:], np.flip(y2[1:])))
-
-        # Create a binary mask of the traced region
-        r, c = skimage.draw.polygon(np.rint(y).astype(int), np.rint(x).astype(int), (video.shape[2], video.shape[3]))
-
-        # Initialize an empty mask and set the traced region to 1
-        large_trace_mask = np.zeros((video.shape[2], video.shape[3]), np.float32)
-        large_trace_mask[r, c] = 1  # Mark the traced area as foreground (1)
-        target.append(large_trace_mask)  # Append the generated mask to the target list
-
-        # Mitral valve
-        mitral_large_x = x2[0] 
-        mitral_large_y = y2[0]
-            
-
-        # -------------------------- Small Trace (ES Frame) Processing --------------------------
-
-        # Extract x and y coordinates from the traced contour
-        x1, y1, x2, y2 = small_trace[:, 0], small_trace[:, 1], small_trace[:, 2], small_trace[:, 3]
-
-        # Concatenate x and y coordinates to form a closed contour
-        x = np.concatenate((x1[1:], np.flip(x2[1:])))  # Flip ensures the contour closes properly
-        y = np.concatenate((y1[1:], np.flip(y2[1:])))
-
-        # Create a binary mask of the traced region
-        r, c = skimage.draw.polygon(np.rint(y).astype(int), np.rint(x).astype(int), (video.shape[2], video.shape[3]))
-
-        # Initialize an empty mask and set the traced region to 1
-        small_trace_mask = np.zeros((video.shape[2], video.shape[3]), np.float32)
-        small_trace_mask[r, c] = 1  # Mark the traced area as foreground (1)
-        target.append(small_trace_mask)  # Append the generated mask to the target list
-
-        # Append clinical measurements (Ejection Fraction, End-Diastolic Volume, End-Systolic Volume)
-        target.append(float(self.outcome[index][self.header.index("EF")]))   #  Append EF value
-        target.append(float(self.outcome[index][self.header.index("EDV")]))  #  Append EDV value
-        target.append(float(self.outcome[index][self.header.index("ESV")]))  #  Append ESV value
-
-        # Mitral valve
-        mitral_small_x = x2[0]
-        mitral_small_y = y2[0]
-        target.append(mitral_large_x)
-        target.append(mitral_large_y)
-        target.append(mitral_small_x)  
-        target.append(mitral_small_y)  
+            # Append ED & ES frame indices to the target list
+            target.append(ed_index)
+            target.append(es_index)
 
 
+            # Append the actual ED and ES frame images from the video
+            target.append(video[:, ed_index, :, :])  # Add the End-Diastolic frame
+            target.append(video[:, es_index, :, :])  # Add the End-Systolic frame
 
-        
+            # Retrieve the traced contour points for the End-Diastolic (ED) and End-Systolic (ES) frames
+            large_trace = self.trace[file_name][self.frames[file_name][-1]]  # ED frame trace (largest frame)
+            small_trace = self.trace[file_name][self.frames[file_name][0]]   # ES frame trace (smallest frame)
+
+            # -------------------------- Large Trace (ED Frame) Processing --------------------------
+
+            # Extract x and y coordinates from the traced contour
+            x1, y1, x2, y2 = large_trace[:, 0], large_trace[:, 1], large_trace[:, 2], large_trace[:, 3]
+
+            # Concatenate x and y coordinates to form a closed contour
+            x = np.concatenate((x1[1:], np.flip(x2[1:])))  # Flip ensures the contour closes properly
+            y = np.concatenate((y1[1:], np.flip(y2[1:])))
+
+            # Create a binary mask of the traced region
+            r, c = skimage.draw.polygon(np.rint(y).astype(int), np.rint(x).astype(int), (video.shape[2], video.shape[3]))
+
+            # Initialize an empty mask and set the traced region to 1
+            large_trace_mask = np.zeros((video.shape[2], video.shape[3]), np.float32)
+            large_trace_mask[r, c] = 1  # Mark the traced area as foreground (1)
+            target.append(large_trace_mask)  # Append the generated mask to the target list
+
+            # Mitral valve
+            mitral_large_x = x2[0] 
+            mitral_large_y = y2[0]
+                
+
+            # -------------------------- Small Trace (ES Frame) Processing --------------------------
+
+            # Extract x and y coordinates from the traced contour
+            x1, y1, x2, y2 = small_trace[:, 0], small_trace[:, 1], small_trace[:, 2], small_trace[:, 3]
+
+            # Concatenate x and y coordinates to form a closed contour
+            x = np.concatenate((x1[1:], np.flip(x2[1:])))  # Flip ensures the contour closes properly
+            y = np.concatenate((y1[1:], np.flip(y2[1:])))
+
+            # Create a binary mask of the traced region
+            r, c = skimage.draw.polygon(np.rint(y).astype(int), np.rint(x).astype(int), (video.shape[2], video.shape[3]))
+
+            # Initialize an empty mask and set the traced region to 1
+            small_trace_mask = np.zeros((video.shape[2], video.shape[3]), np.float32)
+            small_trace_mask[r, c] = 1  # Mark the traced area as foreground (1)
+            target.append(small_trace_mask)  # Append the generated mask to the target list
+
+            # Append clinical measurements (Ejection Fraction, End-Diastolic Volume, End-Systolic Volume)
+            target.append(float(self.outcome[index][self.header.index("EF")]))   #  Append EF value
+            target.append(float(self.outcome[index][self.header.index("EDV")]))  #  Append EDV value
+            target.append(float(self.outcome[index][self.header.index("ESV")]))  #  Append ESV value
+
+
         # target = [Filename, ED Frame Index, ES Frame Index, ED Frame Image, ES Frame Image, 
-        # ED Trace Mask, ES Trace Mask, EF Value, EDV Value, ESV Value,ED_mitral, ED_mitralES_mitral]
+        # ED Trace Mask, ES Trace Mask, EF Value, EDV Value, ESV Value]
         target = tuple(target)
 
 
@@ -187,7 +206,32 @@ class Echo(torchvision.datasets.VisionDataset):
         return len(self.fnames)
 
     def load_video_labels(self):
-        """Load video file names and outcome labels from 'FileList.csv'."""
+        """Load video file names and labels.
+
+        - train/val/test  ➜ read from FileList.csv
+        - external_test   ➜ use every *.avi file found in the specified folder
+        """
+        if self.split in ("EXTERNAL_TEST", "EXT"):  # external test mode
+            ext_dir = (
+                self.external_data_dir
+                if self.external_data_dir is not None
+                else os.path.join(self.root, "ExternalTest")  # default fallback
+            )
+            if not os.path.isdir(ext_dir):
+                raise FileNotFoundError(f"External-test folder not found: {ext_dir}")
+
+            # Accept both .avi and .mp4, case-insensitive
+            self.fnames = sorted([
+                f for f in os.listdir(ext_dir)
+                if f.lower().endswith((".avi", ".mp4"))
+            ])
+
+            # Dummy labels
+            self.header = ["FileName", "EF", "EDV", "ESV"]
+            self.outcome = [[np.nan, np.nan, np.nan, np.nan] for _ in self.fnames]
+            self._external_dir = ext_dir
+            return
+        
         file_list_path  = os.path.join(self.root, "FileList.csv")
         data            = pd.read_csv(file_list_path)
         
@@ -207,6 +251,9 @@ class Echo(torchvision.datasets.VisionDataset):
         self.outcome    = data.values.tolist()
 
     def check_missing_videos(self):
+        if self.split in ("EXTERNAL_TEST", "EXT"):
+            #  skip
+            return
         """Check if any video files are missing from the 'Videos' directory."""
         video_dir           = os.path.join(self.root, "Videos")
         available_videos    = set(os.listdir(video_dir))
