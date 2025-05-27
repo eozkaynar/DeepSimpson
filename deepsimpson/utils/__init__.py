@@ -481,3 +481,32 @@ def compute_ext_video_mean_std(video_path: str) -> tuple[np.ndarray, np.ndarray]
 
     return mean, std
 
+def resize_video(input_path: str, output_path: str, width: int = 112, height: int = 112) -> None:
+    """
+    Resize a video to the given dimensions and save it to a new path.
+
+    Args:
+        input_path (str): Path to the input video file (.mp4 or .avi)
+        output_path (str): Path to save the resized video
+        width (int): Target width of the resized frames
+        height (int): Target height of the resized frames
+    """
+    if not os.path.exists(input_path):
+        raise FileNotFoundError(f"[ERROR] Input video not found: {input_path}")
+    
+    cap = cv2.VideoCapture(input_path)
+    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+    fps = cap.get(cv2.CAP_PROP_FPS)
+    out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
+
+    frame_count = 0
+    while cap.isOpened():
+        ret, frame = cap.read()
+        if not ret:
+            break
+        resized_frame = cv2.resize(frame, (width, height))
+        out.write(resized_frame)
+        frame_count += 1
+
+    cap.release()
+    out.release()
