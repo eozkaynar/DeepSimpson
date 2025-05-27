@@ -3,18 +3,19 @@ import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
 
 from deepsimpson.datasets.EchoSegmentation import Echo
-from deepsimpson.utils import get_mean_and_std, savevideo, savemajoraxis_with_simpson
+from deepsimpson.utils import compute_ext_video_mean_std, savevideo, savemajoraxis_with_simpson
 from deepsimpson.models.sequence_models import LSTM, RNN
 # from deepsimpson.datasets.RNNDataset import Dataset
 from deepsimpson.datasets.LSTMDataset import Dataset_lstm
 import click
+import pandas as pd 
 import matplotlib.pyplot as plt
 import numpy as np
 import scipy.signal
-import skimage.draw
 import torch
 import torchvision
 import tqdm
+import time 
 
 
 
@@ -45,7 +46,7 @@ import tqdm
 @click.option(
     "--weights_reg_lstm",
     type=click.Path(exists=True, dir_okay=False),
-    default="deepsimpson/output/prediction/ED_ES_LSTM/best.pt",
+    default="deepsimpson/output/prediction/ED_ES_LSTM_/best.pt",
     show_default=True,
     help="Path to the pretrained model checkpoint."
 )
@@ -67,7 +68,9 @@ def run(
     device=None,
     seed=0,
 ):
-  
+    
+    overall_start = time.time()
+
     # Seed RNGs
     np.random.seed(seed)
     torch.manual_seed(seed)
@@ -93,8 +96,8 @@ def run(
         checkpoint = torch.load(weights_seg)
         seg_model.load_state_dict(checkpoint['state_dict'])
     except (FileNotFoundError, KeyError, RuntimeError) as e:
-        print(f"\n[ERROR] Failed to load the model: {e}")
-        print("[WARNING] A pre-trained model checkpoint is required for segmentation.")
+        print(f"\nERROR: Failed to load the model: {e}")
+        print("WARNING: A pre-trained model checkpoint is required for segmentation.")
         print("          Please provide a valid path using the '--weights' argument.\n")
         exit(1)  # Safely terminate the program
 
@@ -110,18 +113,34 @@ def run(
 
     model_lstm.to(device).eval()
     model_rnn.to(device).eval()
-    # Compute mean and std
-    # mean, std = get_mean_and_std(Echo(root=data_dir, split="ext", external_data_dir=external_dir))
-    mean = np.array([97.24017664, 95.95814051, 93.87780209])      # RGB sıfır ortalama
-    std = np.array([55.88998819,59.40321542, 59.31306297]) # RGB için eşit standart sapma
 
+    # Compute mean and std
+    # Create list of videos
+    video_files = sorted([
+        f for f in os.listdir(external_dir)
+        if f.endswith((".mp4", ".avi"))
+    ])
+
+    # Create dict to suitiable input  
+    per_video_stats = {}
+
+    for filename in video_files:
+        path = os.path.join(external_dir, filename)
+        mean, std = compute_ext_video_mean_std(path)
+        per_video_stats[filename] = (mean, std)
+
+    print("Computed stats for:")
+    for name, (mean, std) in per_video_stats.items():
+        print(f"{name}:")
+        print("  mean:", np.round(mean, 3))
+        print("  std: ", np.round(std, 3))
 
     # dataset & dataloader 
     split = "ext"
     dataset = Echo(root=data_dir,
                    split=split,
                    external_data_dir=external_dir,
-                   mean=mean, std=std,
+                   external_video_stats=per_video_stats,
                    length=None, max_length=None, period=1)
 
     dataloader = torch.utils.data.DataLoader(
@@ -138,24 +157,31 @@ def run(
         with torch.no_grad():
             
             for (x, (filenames, *_), length) in tqdm.tqdm(dataloader, desc="Save videos"):
-                print("[DEBUG] Normalized input stats:",
-                "min:", x.min().item(), "max:", x.max().item(), "mean:", x.mean().item())
-                print(x.shape)
                 # kademe kademe çıkarım (OOM korumalı)
-                y = np.concatenate([seg_model(x[i:i+sub_bs].to(device))["out"]
-                                        .cpu().numpy()
+                y = np.concatenate([seg_model(x[i:i+sub_bs].to(device).float())["out"].cpu().numpy()
                                         for i in range(0, x.shape[0], sub_bs)])
-                print("[DEBUG] Model output y shape:", y.shape)
-                print("[DEBUG] Output stats:",
-                    "min:", y.min().item(), "max:", y.max().item(), "mean:", y.mean().item())
+
                 start = 0; x = x.numpy()
+                x = x.astype(np.float32)
+
                 for fname, offset in zip(filenames, length):
                     vid   = x[start:start+offset]                        # (F,C,H,W)
                     logit = y[start:start+offset, 0]                 # (F,H,W)
                     start += offset
+
                     # un-normalize
-                    vid = vid * std.reshape(1,3,1,1) + mean.reshape(1,3,1,1)
-                    F,C,H,W = vid.shape; vid = vid.astype(np.uint8)
+                    if fname in per_video_stats:
+                        mean, std = per_video_stats[fname]
+                        mean = mean.reshape(1, 3, 1, 1)
+                        std = std.reshape(1, 3, 1, 1)
+                    else:
+                        raise ValueError(f"ERROR: No mean/std found for file: {fname}")
+
+                    vid = vid.astype(np.float32)          
+                    vid = vid * std + mean                 
+                    vid = np.clip(vid, 0, 255).astype(np.uint8)  
+
+                    F, C, H, W = vid.shape
 
                     pair = np.concatenate((vid, vid), 3)                # side-by-side
                     pair[:, 0, :, W:] = np.maximum(                      # blue mask overlay
@@ -163,19 +189,20 @@ def run(
 
                     pair = pair.transpose(1,0,2,3)                      # (C,F,H,2W)
                     savevideo(os.path.join(output, "videos", fname), pair, 50)
-                    print("[DEBUG] logit shape:", logit.shape, "offset:", offset, "start:", start, "y.shape:", y.shape)
+        
 
-    # -------------------- ED/ES + Simpson measurements ------------------------
+    #  ED/ES + Simpson measurements
     os.makedirs(os.path.join(output, "size"), exist_ok=True)
     seg_model.eval(); sub_bs = 32; results = []
     with torch.no_grad():
         for (x, (fnames, large_i, small_i, *_), length) in tqdm.tqdm(dataloader,
                                                                      desc="Measure"):
-            y = np.concatenate([seg_model(x[i:i+sub_bs].to(device))["out"]
+            y = np.concatenate([seg_model(x[i:i+sub_bs].to(device).float())["out"]
                                 .cpu().numpy()
                                 for i in range(0, x.shape[0], sub_bs)])
             start = 0
             for fname, offset in zip(fnames, length):
+                start_time = time.time()
                 logit = y[start:start+offset, 0]
                 size  = (logit > 0).sum((1,2))
 
@@ -190,10 +217,13 @@ def run(
                                 large_i, small_i))
                 start += offset
 
-    savemajoraxis_with_simpson(results, output, split,
-                               num_discs=20, type="ed-es")
+            savemajoraxis_with_simpson(results, output, split,
+                                    num_discs=20, type="ed-es")
+            end_time = time.time()
+            elapsed = end_time - start_time
+            print(f"Finished segmentation and feature extraction {fname} in {elapsed:.2f} seconds.")
     input_dir = os.path.join(output, "simpsons_ext.csv")
-    import pandas as pd 
+
     # Read combined file
     df_output = pd.read_csv(input_dir)
 
@@ -210,14 +240,19 @@ def run(
 
     with torch.no_grad():
         for (filename, X, _) in tqdm.tqdm(dataset_pred, desc="Predict EF"):
-            X = X.to(device)
+            start_time = time.time()
 
+            X = X.to(device)
             ef_lstm = model_lstm(X).item()
             ef_rnn  = model_rnn(X).item()
 
-            print(f"[RESULT] {filename[0]}")
+            elapsed = time.time() - start_time
+            print(f"{filename[0]}")
             print(f" LSTM Predicted EF: {ef_lstm:.2f}")
             print(f" RNN  Predicted EF: {ef_rnn:.2f}")
+            print(f" EF prediction took {elapsed:.2f} seconds.\n")
+
+    print(f"\nTotal processing time: {time.time() - overall_start:.2f} seconds")
 
 def _video_collate_fn(batch):
     vids, tars = zip(*batch)
