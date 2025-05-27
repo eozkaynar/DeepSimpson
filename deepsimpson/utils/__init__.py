@@ -4,7 +4,9 @@ import torch
 import tqdm
 from sklearn.decomposition import PCA
 import csv
+import typing
 
+import cv2  # pytype: disable=attribute-error
 import matplotlib.pyplot as plt
 
 def clip_line_to_mask(x1, y1, x2, y2, mask, num_points=100):
@@ -195,6 +197,29 @@ def plot_size_curve(filename, size, systole, diastole, output_dir=None, show=Fal
     if show:
         plt.show()
     plt.close()
+
+def savevideo(filename: str, array: np.ndarray, fps: typing.Union[float, int] = 1):
+    """Saves a video to a file.
+
+    Args:
+        filename (str): filename of video
+        array (np.ndarray): video of uint8's with shape (channels=3, frames, height, width)
+        fps (float or int): frames per second
+
+    Returns:
+        None
+    """
+
+    c, _, height, width = array.shape
+
+    if c != 3:
+        raise ValueError("savevideo expects array of shape (channels=3, frames, height, width), got shape ({})".format(", ".join(map(str, array.shape))))
+    fourcc = cv2.VideoWriter_fourcc('M', 'J', 'P', 'G')
+    out = cv2.VideoWriter(filename, fourcc, fps, (width, height))
+
+    for frame in array.transpose((1, 2, 3, 0)):
+        frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+        out.write(frame)
 
 
 
