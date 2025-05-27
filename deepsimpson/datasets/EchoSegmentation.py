@@ -11,7 +11,7 @@ import pandas   as pd
 
 class Echo(torchvision.datasets.VisionDataset):
 
-    def __init__(self, root=None, split="train", mean=0., std=1., length=16, period=2, max_length=250, clips=1, external_data_dir=None):
+    def __init__(self, root=None, split="train", mean=0., std=1., length=16, period=2, max_length=250, clips=1, external_data_dir=None, external_video_stats=None):
         super().__init__(root)
 
         self.split      = split.upper()
@@ -23,6 +23,7 @@ class Echo(torchvision.datasets.VisionDataset):
         self.clips      = clips
         
         self.external_data_dir = external_data_dir
+        self.external_video_stats = external_video_stats
 
          # Initialize attributes
         self.fnames     = []
@@ -49,19 +50,25 @@ class Echo(torchvision.datasets.VisionDataset):
 
         # Load video into np.array
         video = loadvideo(video).astype(np.float32) 
-
         # Apply normalization
-        if isinstance(self.mean, (float, int)):
-           # If mean is a single value, subtract it from all pixels 
-            video -= self.mean
-        else:
-            video -= self.mean.reshape(3, 1, 1, 1)
+        if self.external_video_stats and self.fnames[index] in self.external_video_stats:
+            mean, std = self.external_video_stats[self.fnames[index]]
+            mean = np.array(mean).reshape(3, 1, 1, 1)
+            std = np.array(std).reshape(3, 1, 1, 1)
+            video = (video - mean) / std
+        else: 
 
-        if isinstance(self.std, (float, int)):
-            # If std is a single value, divide all pixels by it
-            video /= self.std
-        else:
-            video /= self.std.reshape(3, 1, 1, 1)   
+            if isinstance(self.mean, (float, int)):
+            # If mean is a single value, subtract it from all pixels 
+                video -= self.mean
+            else:
+                video -= self.mean.reshape(3, 1, 1, 1)
+
+            if isinstance(self.std, (float, int)):
+                # If std is a single value, divide all pixels by it
+                video /= self.std
+            else:
+                video /= self.std.reshape(3, 1, 1, 1)   
 
         # Set number of frames
         c, f, h, w = video.shape
