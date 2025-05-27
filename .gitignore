@@ -4,6 +4,7 @@
 # Output folders and intermediate files
 output_images/
 output/
+output_images/
 *.log
 *.npy
 *.pt
@@ -32,3 +33,7 @@ dist/
 __pycache__/
 *.py[cod]
 *.so
+
+# Videos
+*.mp4
+
