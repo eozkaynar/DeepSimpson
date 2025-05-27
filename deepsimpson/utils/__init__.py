@@ -8,6 +8,8 @@ import typing
 
 import cv2  # pytype: disable=attribute-error
 import matplotlib.pyplot as plt
+from deepsimpson.datasets.EchoSegmentation import loadvideo
+
 
 def clip_line_to_mask(x1, y1, x2, y2, mask, num_points=100):
     """Clips a line to the mask using vectorized numpy operations."""
@@ -457,4 +459,25 @@ def savemajoraxis(results, output, split):
                 print(f"[WARNING] Unrecognized format for savemajoraxis()")
                 continue
 
+
+def compute_ext_video_mean_std(video_path: str) -> tuple[np.ndarray, np.ndarray]:
+    """
+    Load a video and compute per-channel mean and std.
+
+    Args:
+        video_path (str): Path to the video file (.mp4 or .avi)
+
+    Returns:
+        mean (np.ndarray): Per-channel mean of shape (3,)
+        std (np.ndarray): Per-channel std of shape (3,)
+    """
+    # Load video (C, F, H, W)
+    # video = loadvideo(video_path).astype(np.float32)
+    video = loadvideo(video_path)
+
+    # Compute per-channel mean and std
+    mean = video.mean(axis=(1, 2, 3))  # RGB mean
+    std = video.std(axis=(1, 2, 3))    # RGB std
+
+    return mean, std
 
