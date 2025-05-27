@@ -39,7 +39,7 @@ class RNN(nn.Module):
     
 
 class LSTM(nn.Module):
-    def __init__(self, input_size, hidden_size=64, num_classes=1):
+    def __init__(self, input_size, hidden_size=128, num_classes=1):
         """
         input_size: The number of features in the input at each time step. 
         hidden_size: The number of features in the hidden state.

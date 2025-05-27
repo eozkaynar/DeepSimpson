@@ -20,7 +20,7 @@ import time
 
 
 @click.command("segmentation")
-@click.option("--data_dir", type=click.Path(exists=True, file_okay=False), default="/home/eda/Desktop/DeepSimpson/deepsimpson/output/features")
+@click.option("--data_dir", type=click.Path(exists=True, file_okay=True), default="/home/eda/Desktop/DeepSimpson/deepsimpson/output/features/fixed_frame_ed_es.csv")
 @click.option("--output_path", type=click.Path(file_okay=False), default=None)
 @click.option("--model_name", type=click.Choice(["LSTM", "RNN"]), default="LSTM")
 @click.option("--weights", type=click.Path(exists=True, dir_okay=False), default=None)
