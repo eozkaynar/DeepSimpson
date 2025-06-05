@@ -361,7 +361,7 @@ def savesize(results, output, split):
             write_size(filename, "ES", es_idx, size_es)
 
         else:
-            print(f"[WARNING] Unrecognized result format savesize()")
+            print(f"WARNING: Unrecognized result format savesize()")
 
 
 
